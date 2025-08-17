@@ -1,0 +1,20 @@
+version: "3.9"
+
+services:
+  frontend:
+    build:
+      context: ./product-inventory
+      dockerfile: Dockerfile
+    ports:
+      - "3000:4173"   # host:container (Vite preview runs on 4173)
+    depends_on:
+      - backend
+    environment:
+      - VITE_API_URL=http://backend:8000   # frontend can call backend by container name
+
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
