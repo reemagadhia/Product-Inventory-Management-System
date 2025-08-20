@@ -1,11 +1,14 @@
-from pydantic import BaseModel, Field
-from datetime import date
+from sqlalchemy import Column, Integer, String, Float, Date
+from configs.database import Base
 
-class Product(BaseModel):
-    product_sku: str = Field(..., alias="Product SKU")
-    product_name: str = Field(..., alias="Product Name")
-    category: str = Field(..., alias="Category")
-    purchase_date: date = Field(..., alias="Purchase Date")
-    unit_price: float = Field(..., alias="Unit Price")
-    quantity: int = Field(..., alias="Quantity")
-    stock_age_days: int = Field(..., alias="Stock Age (Days)")
+class ProductDB(Base):
+    __tablename__ = "products"
+
+
+    id = Column(Integer, primary_key=True, index=True)
+    product_sku = Column(String, index=True)
+    product_name = Column(String, index=True)
+    category = Column(String, index=True)
+    purchase_date = Column(Date)
+    unit_price = Column(Float)
+    quantity = Column(Integer)

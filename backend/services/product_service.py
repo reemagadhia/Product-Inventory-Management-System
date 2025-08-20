@@ -1,9 +1,9 @@
 import pandas as pd
 from io import BytesIO
-from fastapi import HTTPException
 from datetime import date
-from models.product import Product
-from typing import List
+from fastapi import HTTPException
+from sqlalchemy.orm import Session
+from models.product import ProductDB
 
 REQUIRED_COLUMNS = [
     "Product SKU",
@@ -14,43 +14,68 @@ REQUIRED_COLUMNS = [
     "Quantity",
 ]
 
-async def process_excel(file) -> List[Product]:
-    filename = (file.filename or "").lower()
-    if not (filename.endswith(".xlsx") or filename.endswith(".xls")):
-        raise HTTPException(status_code=400, detail="Only .xlsx or .xls files are supported")
-
-    content = await file.read()
+def process_excel(file_content: bytes, db: Session):
     try:
-        df = pd.read_excel(BytesIO(content))
+        df = pd.read_excel(BytesIO(file_content))
     except Exception as e:
         raise HTTPException(status_code=400, detail=f"Failed to read Excel: {e}")
 
-    # Check required columns
     missing = [c for c in REQUIRED_COLUMNS if c not in df.columns]
     if missing:
         raise HTTPException(status_code=400, detail=f"Missing columns: {', '.join(missing)}")
 
-    # Parse purchase date & calculate stock age
     df["Purchase Date"] = pd.to_datetime(df["Purchase Date"])
-    today = pd.Timestamp.today().normalize()
-    df["Stock Age (Days)"] = (today - df["Purchase Date"]).dt.days
 
-    # Check for duplicates
     duplicates = df[df.duplicated(subset=["Product SKU", "Purchase Date"], keep=False)]
     if not duplicates.empty:
         duplicate_rows = [
-            {k: (v.isoformat() if isinstance(v, date) else v) for k, v in row.items()}
+            {k: (v.isoformat() if hasattr(v, "isoformat") else v) for k, v in row.items()}
             for row in duplicates.to_dict(orient="records")
         ]
         raise HTTPException(
             status_code=400,
-            detail={
-                "error": "Duplicate rows found based on Product SKU + Purchase Date",
-                "duplicates": duplicate_rows,
-            },
+            detail={"error": "Duplicate rows found in file!", "duplicates": duplicate_rows},
         )
 
-    # Map to Product model
-    data = df.to_dict(orient="records")
-    products: List[Product] = [Product(**row) for row in data]
-    return products
+    for _, row in df.iterrows():
+        exists = db.query(ProductDB).filter(
+            ProductDB.product_sku == row["Product SKU"],
+            ProductDB.purchase_date == row["Purchase Date"].date()
+        ).first()
+        if exists:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Duplicate entry in DB for SKU {row['Product SKU']} on {row['Purchase Date'].date()}",
+            )
+
+        product = ProductDB(
+            product_sku=row["Product SKU"],
+            product_name=row["Product Name"],
+            category=row["Category"],
+            purchase_date=row["Purchase Date"].date(),
+            unit_price=row["Unit Price"],
+            quantity=row["Quantity"]
+        )
+        db.add(product)
+
+    db.commit()
+    return len(df)
+
+
+def get_all_products(db: Session):
+    products = db.query(ProductDB).all()
+    today = date.today()
+
+    result = [
+        {
+            "Product SKU": p.product_sku,
+            "Product Name": p.product_name,
+            "Category": p.category,
+            "Purchase Date": p.purchase_date,
+            "Unit Price": p.unit_price,
+            "Quantity": p.quantity,
+            "Stock Age (Days)": (today - p.purchase_date).days
+        }
+        for p in products
+    ]
+    return result

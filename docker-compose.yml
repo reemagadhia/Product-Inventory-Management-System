@@ -6,7 +6,7 @@ services:
       context: ./product-inventory
       dockerfile: Dockerfile
     ports:
-      - "3000:4173"   # host:container (Vite preview runs on 4173)
+      - "4173:4173"   # host:container (Vite preview runs on 4173)
     depends_on:
       - backend
     environment:

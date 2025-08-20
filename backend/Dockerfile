@@ -19,7 +19,8 @@ RUN pip install --no-cache-dir \
     pydantic \
     pandas \
     openpyxl \
-    xlrd
+    xlrd \
+    sqlalchemy
 
 # Copy project files into container
 COPY . .

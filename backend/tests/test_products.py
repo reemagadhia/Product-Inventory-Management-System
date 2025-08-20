@@ -5,6 +5,7 @@ from main import app
 
 client = TestClient(app)
 
+
 def create_excel_file(data: dict) -> bytes:
     """Helper: create in-memory Excel file from dict."""
     df = pd.DataFrame(data)
@@ -25,23 +26,30 @@ def test_upload_valid_excel():
     }
     excel_bytes = create_excel_file(data)
 
-    # Act
+    # Act: upload
     response = client.post(
-        "/products/upload-excel",
+        "/upload-excel",  # ✅ your actual route name
         files={"file": ("test.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
-    # Assert
+    # Assert upload succeeded
     assert response.status_code == 200
-    result = response.json()
+    assert "Uploaded" in response.json()["message"]
+
+    # Act: fetch products
+    products_resp = client.get("/products")
+    assert products_resp.status_code == 200
+    result = products_resp.json()
+
+    # Assert product exists
     assert len(result) == 1
-    assert result[0]["product_sku"] == "SKU1"
-    assert "stock_age_days" in result[0]
+    assert result[0]["Product SKU"] == "SKU1"
+    assert "Stock Age (Days)" in result[0]
 
 
 def test_upload_invalid_filetype():
     response = client.post(
-        "/products/upload-excel",
+        "/upload-excel",
         files={"file": ("test.txt", b"not an excel", "text/plain")},
     )
     assert response.status_code == 400
@@ -60,7 +68,7 @@ def test_upload_missing_columns():
     excel_bytes = create_excel_file(data)
 
     response = client.post(
-        "/products/upload-excel",
+        "/upload-excel",
         files={"file": ("test.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
@@ -80,8 +88,8 @@ def test_upload_duplicate_rows():
     excel_bytes = create_excel_file(data)
 
     response = client.post(
-        "/products/upload-excel",
-        files={"file": ("test.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
+        "/upload-excel",
+        files={"file": ("Product-Repository.xlsx", excel_bytes, "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet")},
     )
 
     assert response.status_code == 400
