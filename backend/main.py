@@ -5,7 +5,6 @@ from api import product_api
 
 app = FastAPI(title="Product Inventory API", version="1.0.0")
 
-# Enable CORS
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],
@@ -14,10 +13,8 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# Create tables
 Base.metadata.create_all(bind=engine)
 
-# Register routers
 app.include_router(product_api.router)
 
 @app.get("/health")
